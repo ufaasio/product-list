@@ -3,18 +3,27 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any, Literal
 
-from fastapi_mongo_base._utils.bsontools import decimal_amount
 from fastapi_mongo_base.schemas import BusinessOwnedEntitySchema
-from pydantic import BaseModel, field_validator
+from fastapi_mongo_base.utils.aionetwork import aio_request
+from fastapi_mongo_base.utils.bsontools import Decimal128, decimal_amount
+from pydantic import BaseModel, ConfigDict, field_validator
 from server.config import Settings
-from utils.aionetwork import aio_request
+
+
+def decimal_amount(value):
+    if isinstance(value, Decimal128):
+        return value.to_decimal()  # directly convert Decimal128 to decimal
+    return Decimal(value)  # convert any other type directly to Decimal
 
 
 class Bundle(BaseModel):
     asset: str
     quota: Decimal
     order: Literal[0, 1, 2] = 1
-    unit: str = "unit"
+    unit: str | None = None
+    meta_data: dict | None = None
+
+    model_config = ConfigDict(allow_inf_nan=True)
 
     @field_validator("quota", mode="before")
     def validate_quota(cls, value):
@@ -26,15 +35,24 @@ class ItemType(str, Enum):
     retail_product = "retail_product"
 
 
+class ProductStatus(str, Enum):
+    active = "active"
+    inactive = "inactive"
+    expired = "expired"
+    deleted = "deleted"
+    trial = "trial"
+
+
 class ProductSchema(BusinessOwnedEntitySchema):
     name: str
     description: str | None = None
     unit_price: Decimal
     currency: str = Settings.currency
-    # quantity: Decimal = Decimal(1)
+    quantity: Decimal = Decimal(1)  # Stock quantity
 
     # Item type to distinguish between SaaS and e-commerce
     item_type: ItemType = ItemType.retail_product  # Default to e-commerce product
+    variant: dict[str, str] | None = None
 
     product_url: str | None = None
     webhook_url: str | None = None
@@ -49,16 +67,18 @@ class ProductSchema(BusinessOwnedEntitySchema):
     plan_duration: int | None = None  # Only for SaaS packages
     bundles: list[Bundle] | None = None  # Optional field for SaaS packages
 
-    variant: dict[str, str] | None = None
-
     # Optional additional data field for future extensions or custom data
-    extra_data: dict | None = None
+    # extra_data: dict | None = None
 
-    @field_validator("unit_price")
+    status: ProductStatus = ProductStatus.active
+
+    model_config = ConfigDict(allow_inf_nan=True)
+
+    @field_validator("unit_price", mode="before")
     def validate_price(cls, value):
         return decimal_amount(value)
 
-    @field_validator("quantity")
+    @field_validator("quantity", mode="before")
     def validate_quantity(cls, value):
         return decimal_amount(value)
 
@@ -96,8 +116,9 @@ class ProductCreateSchema(BaseModel):
     description: str | None = None
     unit_price: Decimal
     currency: str = Settings.currency
-    quantity: Decimal = Decimal(1)
+    # quantity: Decimal = Decimal(1)
     variant: dict[str, str] | None = None
+    item_type: ItemType = ItemType.retail_product  # Default to e-commerce product
 
     webhook_url: str | None = None
 

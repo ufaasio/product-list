@@ -1,6 +1,11 @@
 import uuid
 
-from fastapi import Request
+from fastapi import Query, Request
+from fastapi_mongo_base.core.exceptions import BaseHTTPException
+from ufaas_fastapi_business.middlewares import (
+    AuthorizationData,
+    authorization_middleware,
+)
 from ufaas_fastapi_business.routes import AbstractAuthRouter
 
 from .models import Product
@@ -14,8 +19,16 @@ class ProductsRouter(AbstractAuthRouter[Product, ProductSchema]):
     def config_routes(self, **kwargs):
         super().config_routes(**kwargs)
 
-    async def list_items(self, request: Request):
-        return await super().list_items(request, 0, 10)
+    async def get_auth(self, request: Request) -> AuthorizationData:
+        auth = await authorization_middleware(request, anonymous_accepted=True)
+        if auth.issuer_type == "User" and request.method != "GET":
+            raise BaseHTTPException(401, "unauthorized", "Unauthorized")
+        return auth
+
+    async def list_items(
+        self, request: Request, offset: int = Query(0), limit: int = Query(10)
+    ):
+        return await super().list_items(request, offset=offset, limit=limit)
 
     async def create_item(self, request: Request, data: ProductCreateSchema):
         await super().create_item(request, data.model_dump())
