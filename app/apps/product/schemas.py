@@ -52,7 +52,7 @@ class ProductSchema(BusinessOwnedEntitySchema):
 
     # Item type to distinguish between SaaS and e-commerce
     item_type: ItemType = ItemType.retail_product  # Default to e-commerce product
-    variant: dict[str, str] | None = None
+    variant: str | None = None
 
     product_url: str | None = None
     webhook_url: str | None = None
@@ -117,7 +117,7 @@ class ProductCreateSchema(BaseModel):
     unit_price: Decimal
     currency: str = Settings.currency
     # quantity: Decimal = Decimal(1)
-    variant: dict[str, str] | None = None
+    variant: str | None = None
     item_type: ItemType = ItemType.retail_product  # Default to e-commerce product
 
     webhook_url: str | None = None
@@ -136,7 +136,7 @@ class ProductUpdateSchema(BaseModel):
     unit_price: Decimal
     currency: str = Settings.currency
     quantity: Decimal = Decimal(1)
-    variant: dict[str, str] | None = None
+    variant: str | None = None
 
     webhook_url: str | None = None
 
