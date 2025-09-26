@@ -1,5 +1,6 @@
-from apps.product.routes import router as product_router
 from fastapi_mongo_base.core import app_factory
+
+from apps.product.routes import router as product_router
 
 from . import config
 

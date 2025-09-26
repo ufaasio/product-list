@@ -1,19 +1,14 @@
 import uuid
 from decimal import Decimal
-from enum import Enum
-from typing import Any, Literal
+from enum import StrEnum
+from typing import Literal
 
-from fastapi_mongo_base.schemas import BusinessOwnedEntitySchema
-from fastapi_mongo_base.utils.aionetwork import aio_request
-from fastapi_mongo_base.utils.bsontools import Decimal128, decimal_amount
+import httpx
+from fastapi_mongo_base.schemas import TenantUserEntitySchema
+from fastapi_mongo_base.utils.bsontools import decimal_amount
 from pydantic import BaseModel, ConfigDict, field_validator
+
 from server.config import Settings
-
-
-def decimal_amount(value):
-    if isinstance(value, Decimal128):
-        return value.to_decimal()  # directly convert Decimal128 to decimal
-    return Decimal(value)  # convert any other type directly to Decimal
 
 
 class Bundle(BaseModel):
@@ -26,16 +21,17 @@ class Bundle(BaseModel):
     model_config = ConfigDict(allow_inf_nan=True)
 
     @field_validator("quota", mode="before")
-    def validate_quota(cls, value):
+    @classmethod
+    def validate_quota(cls, value: Decimal) -> Decimal:
         return decimal_amount(value)
 
 
-class ItemType(str, Enum):
+class ItemType(StrEnum):
     saas_package = "saas_package"
     retail_product = "retail_product"
 
 
-class ProductStatus(str, Enum):
+class ProductStatus(StrEnum):
     active = "active"
     inactive = "inactive"
     expired = "expired"
@@ -43,7 +39,7 @@ class ProductStatus(str, Enum):
     trial = "trial"
 
 
-class ProductSchema(BusinessOwnedEntitySchema):
+class ProductSchema(TenantUserEntitySchema):
     name: str
     description: str | None = None
     unit_price: Decimal
@@ -75,40 +71,45 @@ class ProductSchema(BusinessOwnedEntitySchema):
     model_config = ConfigDict(allow_inf_nan=True)
 
     @field_validator("unit_price", mode="before")
-    def validate_price(cls, value):
+    @classmethod
+    def validate_price(cls, value: Decimal) -> Decimal:
         return decimal_amount(value)
 
     @field_validator("quantity", mode="before")
-    def validate_quantity(cls, value):
+    @classmethod
+    def validate_quantity(cls, value: Decimal) -> Decimal:
         return decimal_amount(value)
 
-    async def validate_product(self):
+    async def validate_product(self) -> bool:
         if self.validation_url is None:
             return True
 
-        validation_data = await aio_request(method="GET", url=self.validation_url)
+        async with httpx.AsyncClient() as client:
+            response = await client.get(self.validation_url)
+            response.raise_for_status()
+            validation_data: dict = response.json()
+
         if validation_data.get("price") != self.unit_price:
             return False
 
         if validation_data.get("stock_quantity") is None:
             return True
 
-        if validation_data.get("stock_quantity") < self.quantity:
-            return False
+        return not validation_data.get("stock_quantity") < self.quantity
 
-        return True
-
-    async def reserve_product(self):
+    async def reserve_product(self) -> None:
         if self.reserve_url is None:
             return
 
-        await aio_request(method="POST", url=self.reserve_url, json=self.model_dump())
+        async with httpx.AsyncClient() as client:
+            await client.post(self.reserve_url, json=self.model_dump())
 
-    async def webhook_product(self):
+    async def webhook_product(self) -> None:
         if self.webhook_url is None:
             return
 
-        await aio_request(method="POST", url=self.webhook_url, json=self.model_dump())
+        async with httpx.AsyncClient() as client:
+            await client.post(self.webhook_url, json=self.model_dump())
 
 
 class ProductCreateSchema(BaseModel):
@@ -126,7 +127,7 @@ class ProductCreateSchema(BaseModel):
     tax_id: str | None = None
     merchant: str | None = None
 
-    meta_data: dict[str, Any] | None = None
+    meta_data: dict[str, object] | None = None
     data: dict | None = None
 
 
@@ -144,5 +145,5 @@ class ProductUpdateSchema(BaseModel):
     tax_id: str | None = None
     merchant: str | None = None
 
-    meta_data: dict[str, Any] | None = None
+    meta_data: dict[str, object] | None = None
     data: dict | None = None
