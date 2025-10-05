@@ -1,10 +1,9 @@
-import uuid
 from decimal import Decimal
 from enum import StrEnum
 from typing import Literal
 
 import httpx
-from fastapi_mongo_base.schemas import TenantUserEntitySchema
+from fastapi_mongo_base.schemas import UserOwnedEntitySchema
 from fastapi_mongo_base.utils.bsontools import decimal_amount
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -39,7 +38,7 @@ class ProductStatus(StrEnum):
     trial = "trial"
 
 
-class ProductSchema(TenantUserEntitySchema):
+class ProductSchema(UserOwnedEntitySchema):
     name: str
     description: str | None = None
     unit_price: Decimal
@@ -55,7 +54,7 @@ class ProductSchema(TenantUserEntitySchema):
     reserve_url: str | None = None
     validation_url: str | None = None
 
-    revenue_share_id: uuid.UUID | None = None
+    revenue_share_id: str | None = None
     tax_id: str | None = None
     merchant: str | None = None
 
@@ -95,7 +94,7 @@ class ProductSchema(TenantUserEntitySchema):
         if validation_data.get("stock_quantity") is None:
             return True
 
-        return not validation_data.get("stock_quantity") < self.quantity
+        return not validation_data.get("stock_quantity", 0) < self.quantity
 
     async def reserve_product(self) -> None:
         if self.reserve_url is None:
@@ -123,7 +122,7 @@ class ProductCreateSchema(BaseModel):
 
     webhook_url: str | None = None
 
-    revenue_share_id: uuid.UUID | None = None
+    revenue_share_id: str | None = None
     tax_id: str | None = None
     merchant: str | None = None
 
@@ -141,7 +140,7 @@ class ProductUpdateSchema(BaseModel):
 
     webhook_url: str | None = None
 
-    revenue_share_id: uuid.UUID | None = None
+    revenue_share_id: str | None = None
     tax_id: str | None = None
     merchant: str | None = None
 

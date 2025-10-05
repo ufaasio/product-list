@@ -1,7 +1,7 @@
-from fastapi_mongo_base.models import TenantUserEntity
+from fastapi_mongo_base.models import UserOwnedEntity
 
 from .schemas import ProductSchema
 
 
-class Product(ProductSchema, TenantUserEntity):
+class Product(ProductSchema, UserOwnedEntity):
     pass

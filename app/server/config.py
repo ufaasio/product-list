@@ -1,7 +1,6 @@
 """FastAPI server configuration."""
 
 import dataclasses
-import os
 from pathlib import Path
 
 import dotenv
@@ -14,7 +13,6 @@ dotenv.load_dotenv()
 class Settings(config.Settings):
     """Server config settings."""
 
-    project_name: str = os.getenv("PROJECT_NAME")
     base_dir: Path = Path(__file__).resolve().parent.parent
     base_path: str = "/api/products/v1"
 
