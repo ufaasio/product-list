@@ -29,6 +29,10 @@ class ProductsRouter(usso_routes.AbstractTenantUSSORouter):
         )
         return usso(request)
 
+    async def retrieve_item(self, request: Request, uid: str) -> Product:
+        item = await self.get_item(uid=uid)
+        return item
+
     async def create_item(self, request: Request, data: ProductCreateSchema) -> Product:
         return await super().create_item(request, data.model_dump())
 
